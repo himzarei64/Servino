@@ -57,8 +57,29 @@ function persist(){localStorage.setItem('servino_customers',JSON.stringify(custo
 function toast(t){$('toast').textContent=t;$('toast').classList.add('show');setTimeout(()=>$('toast').classList.remove('show'),2600)}
 function refresh(){ $('statCustomers').textContent=fa(customers.length);$('statCars').textContent=fa(customers.length);$('statServices').textContent=fa(services.length);$('statDue').textContent=fa(services.filter(s=>s.nextDate).length);renderCustomers();renderServices();renderRecent() }
 function serviceButtons(){ $('quickServices').innerHTML=serviceTypes.slice(0,6).map(([n,i])=>`<button class="service" onclick="openModal('service','${n}')"><span class="sicon">${i}</span><b>${n}</b><small>ثبت سرویس جدید ←</small></button>`).join('') }
-function openModal(type,chosen=''){mode=type;$('modalTitle').textContent=type==='customer'?'ثبت مشتری و خودرو':'ثبت سرویس جدید';let fields=type==='customer'?[['name','نام و نام خانوادگی','text','مثلاً علی رضایی',1],['phone','شماره موبایل','tel','09xxxxxxxxx'],['car','مدل خودرو','text','مثلاً پژو ۲۰۶'],['plate','شماره پلاک','text','۱۲ ب ۳۴۵ ایران ۶۷'],['year','سال ساخت','text','۱۴۰۰'],['note','توضیحات','textarea','',1]]:[['phone','شماره موبایل مشتری','tel','شماره موبایل ثبت‌شده'],['plate','شماره پلاک','text','شماره پلاک خودرو'],['type','نوع سرویس','select',serviceTypes.map(x=>x[0]),0,chosen],['date','تاریخ انجام سرویس','date',''],['km','کیلومتر فعلی خودرو','number','مثلاً ۸۵۰۰۰'],['details','شرح / قطعات مصرفی','textarea','برند روغن، قطعه مصرفی و ...',1],['nextDate','تاریخ سرویس بعدی','date',''],['nextKm','کیلومتر سرویس بعدی','number','مثلاً ۹۰۰۰۰']];$('formFields').innerHTML=fields.map(([id,label,type,ph,full,def])=>`<div class="field ${full?'full':''}"><label>${label}</label>${type==='select'?`<select name="${id}" required>${ph.map(x=>`<option ${x===def?'selected':''}>${x}</option>`).join('')}</select>`:type==='textarea'?`<textarea name="${id}" placeholder="${ph}"></textarea>`:`<input name="${id}" type="${type}" placeholder="${ph}" ${['name','phone','car','plate','type','date'].includes(id)?'required':''}>`}</div>`).join('');$('modalback').classList.add('show')}
+function openModal(type,chosen=''){mode=type;$('modalTitle').textContent=type==='customer'?'ثبت مشتری و خودرو':'ثبت سرویس جدید';let fields=type==='customer'?[['name','نام و نام خانوادگی','text','مثلاً علی رضایی',1],['phone','شماره موبایل','tel','09xxxxxxxxx'],['car','مدل خودرو','text','مثلاً پژو ۲۰۶'],['plate','شماره پلاک','text','۱۲ ب ۳۴۵ ایران ۶۷'],['year','سال ساخت','text','۱۴۰۰'],['note','توضیحات','textarea','',1]]:[['phone','شماره موبایل مشتری','tel','شماره موبایل ثبت‌شده'],['plate','شماره پلاک','text','شماره پلاک خودرو'],['type','نوع سرویس','select',serviceTypes.map(x=>x[0]),0,chosen],['date','تاریخ انجام سرویس (شمسی)','text','مثلاً ۱۴۰۵/۰۸/۱۶'],['km','کیلومتر فعلی خودرو','number','مثلاً ۸۵۰۰۰'],['details','شرح / قطعات مصرفی','textarea','برند روغن، قطعه مصرفی و ...',1],['nextDate','تاریخ سرویس بعدی (شمسی)','text','مثلاً ۱۴۰۶/۰۲/۱۶'],['nextKm','کیلومتر سرویس بعدی','number','مثلاً ۹۰۰۰۰']];$('formFields').innerHTML=fields.map(([id,label,type,ph,full,def])=>`<div class="field ${full?'full':''}"><label>${label}</label>${type==='select'?`<select name="${id}" required>${ph.map(x=>`<option ${x===def?'selected':''}>${x}</option>`).join('')}</select>`:type==='textarea'?`<textarea name="${id}" placeholder="${ph}"></textarea>`:`<input name="${id}" type="${type}" placeholder="${ph}" ${['name','phone','car','plate','type','date'].includes(id)?'required':''}>`}</div>`).join('');$('modalback').classList.add('show')}
 function closeModal(){$('modalback').classList.remove('show')}
+function jalaliToISO(value){
+ const raw=toEnglishDigits(value).trim().replace(/[.\-]/g,'/');
+ if(!raw) return '';
+ const m=raw.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/);
+ if(!m) throw new Error('تاریخ را به شکل سال/ماه/روز شمسی وارد کنید.');
+ const jy=+m[1], jm=+m[2], jd=+m[3];
+ if(jm<1||jm>12||jd<1||jd>31) throw new Error('تاریخ شمسی معتبر نیست.');
+ const fmt=new Intl.DateTimeFormat('en-u-ca-persian-nu-latn',{year:'numeric',month:'numeric',day:'numeric',timeZone:'UTC'});
+ const start=Date.UTC(jy+621,0,1);
+ for(let i=0;i<370;i++){
+  const d=new Date(start+i*86400000);
+  const parts=Object.fromEntries(fmt.formatToParts(d).filter(x=>x.type!=='literal').map(x=>[x.type,+x.value]));
+  if(parts.year===jy&&parts.month===jm&&parts.day===jd) return d.toISOString().slice(0,10);
+ }
+ throw new Error('این تاریخ شمسی معتبر نیست.');
+}
+function displayDate(iso){
+ if(!iso) return '—';
+ const d=new Date(iso+'T12:00:00Z');
+ return new Intl.DateTimeFormat('fa-IR-u-ca-persian',{year:'numeric',month:'2-digit',day:'2-digit',timeZone:'UTC'}).format(d);
+}
 function saveForm(e){
  e.preventDefault();
  try{
@@ -70,21 +91,22 @@ function saveForm(e){
    toast('مشتری و خودرو با موفقیت ثبت شد.');
   }else{
    const phone=normalize(d.phone), plate=normalize(d.plate);
+   d.date=jalaliToISO(d.date); d.nextDate=jalaliToISO(d.nextDate);
    const c=customers.find(x=>normalize(x.phone)===phone && normalize(x.plate)===plate);
    if(!c){toast('مشتری پیدا نشد؛ شماره موبایل و پلاک را دقیقاً مطابق پرونده وارد کنید.');return;}
    services.push({...d,phone:toEnglishDigits(d.phone),name:c.name,car:c.car,id:Date.now()});
    toast('سرویس با موفقیت ثبت شد.');
   }
   persist();closeModal();e.target.reset();
- }catch(err){console.error(err);toast('خطا در ثبت اطلاعات؛ صفحه را تازه‌سازی کنید و دوباره تلاش کنید.');}
+ }catch(err){console.error(err);toast(err.message||'خطا در ثبت اطلاعات؛ دوباره تلاش کنید.');}
 }
 function toEnglishDigits(s){return String(s??'').replace(/[۰-۹٠-٩]/g,ch=>String('۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩'.indexOf(ch)%10));}
-function normalize(s){return toEnglishDigits(s).replace(/[\s\-ـ]/g,'').toLowerCase();}
+function normalize(s){return toEnglishDigits(s).replace(/[\s\-ـ_]/g,'').toLowerCase();}
 function renderCustomers(){let q=normalize($('customerFilter')?.value);let list=customers.filter(c=>!q||normalize(c.name+c.phone+c.plate+c.car).includes(q));$('customerRows').innerHTML=list.length?list.map(c=>`<tr><td>${c.name}</td><td>${c.phone}</td><td>${c.car}</td><td>${c.plate}</td><td><button class="btn secondary" onclick="showRecord('${c.phone}')">پرونده</button></td></tr>`).join(''):`<tr><td colspan="5" class="empty">موردی ثبت نشده است.</td></tr>`}
-function renderServices(){let q=normalize($('serviceFilter')?.value);let list=services.filter(s=>!q||normalize(s.name+s.phone+s.plate+s.type).includes(q));$('serviceRows').innerHTML=list.length?list.slice().reverse().map(s=>`<tr><td>${s.name}</td><td>${s.car} · ${s.plate}</td><td>${s.type}</td><td>${s.date||'—'}</td><td>${s.km?fa(s.km):'—'}</td><td>${s.nextDate|| (s.nextKm?fa(s.nextKm)+' کیلومتر':'—')}</td></tr>`).join(''):`<tr><td colspan="6" class="empty">هنوز سرویسی ثبت نشده است.</td></tr>`}
-function renderRecent(){$('recentRows').innerHTML=services.length?services.slice(-5).reverse().map(s=>`<tr><td>${s.name}</td><td>${s.car}</td><td>${s.type}</td><td>${s.date||'—'}</td><td>${s.km?fa(s.km):'—'}</td></tr>`).join(''):`<tr><td colspan="5" class="empty">هنوز سرویسی ثبت نشده است.</td></tr>`}
+function renderServices(){let q=normalize($('serviceFilter')?.value);let list=services.filter(s=>!q||normalize(s.name+s.phone+s.plate+s.type).includes(q));$('serviceRows').innerHTML=list.length?list.slice().reverse().map(s=>`<tr><td>${s.name}</td><td>${s.car} · ${s.plate}</td><td>${s.type}</td><td>${displayDate(s.date)}</td><td>${s.km?fa(s.km):'—'}</td><td>${s.nextDate?displayDate(s.nextDate):(s.nextKm?fa(s.nextKm)+' کیلومتر':'—')}</td></tr>`).join(''):`<tr><td colspan="6" class="empty">هنوز سرویسی ثبت نشده است.</td></tr>`}
+function renderRecent(){$('recentRows').innerHTML=services.length?services.slice(-5).reverse().map(s=>`<tr><td>${s.name}</td><td>${s.car}</td><td>${s.type}</td><td>${displayDate(s.date)}</td><td>${s.km?fa(s.km):'—'}</td></tr>`).join(''):`<tr><td colspan="5" class="empty">هنوز سرویسی ثبت نشده است.</td></tr>`}
 function quickSearch(){let q=normalize($('quickSearch').value);if(!q){$('searchResults').className='empty';$('searchResults').textContent='برای مشاهده پرونده، شماره موبایل یا پلاک را جستجو کنید.';return}let list=customers.filter(c=>normalize(c.phone).includes(q)||normalize(c.plate).includes(q));$('searchResults').className='';$('searchResults').innerHTML=list.length?list.map(c=>`<div style="border:1px solid var(--line);padding:12px;border-radius:10px;margin:7px 0;display:flex;justify-content:space-between;align-items:center;gap:10px"><div><b style="font-size:12px">${c.name}</b><div style="font-size:10px;color:var(--muted);margin-top:4px">${c.car} · ${c.plate} · ${c.phone}</div></div><button class="btn secondary" onclick="showRecord('${c.phone}')">مشاهده پرونده</button></div>`).join(''):'<div class="empty">مشتری یا خودرویی با این مشخصات پیدا نشد.</div>'}
-function showRecord(phone){let c=customers.find(x=>x.phone===phone);let ss=services.filter(s=>s.phone===phone);alert(`پرونده ${c.name}\nخودرو: ${c.car}\nپلاک: ${c.plate}\nموبایل: ${c.phone}\n\nتعداد سرویس‌های ثبت‌شده: ${ss.length}\n`+(ss.length?ss.map(s=>`• ${s.type} | ${s.date||'بدون تاریخ'} | ${s.km||'—'} کیلومتر`).join('\n'):'هنوز سرویسی ثبت نشده است.'))}
+function showRecord(phone){let c=customers.find(x=>x.phone===phone);let ss=services.filter(s=>s.phone===phone);alert(`پرونده ${c.name}\nخودرو: ${c.car}\nپلاک: ${c.plate}\nموبایل: ${c.phone}\n\nتعداد سرویس‌های ثبت‌شده: ${ss.length}\n`+(ss.length?ss.map(s=>`• ${s.type} | ${s.date?displayDate(s.date):'بدون تاریخ'} | ${s.km||'—'} کیلومتر`).join('\n'):'هنوز سرویسی ثبت نشده است.'))}
 document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));b.classList.add('active');$('page-'+b.dataset.page).classList.add('active');$('crumb').textContent=b.textContent.trim()}));
 serviceButtons();refresh();
 </script></body></html>
